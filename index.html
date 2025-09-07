@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitQuery - Chat with Any GitHub Repo</title>
+    <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/venkatram-2005/GitQuery/main/public/favicon.ico">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Gochi+Hand&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles inspired by the W&B, futuristic aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #E0E0E0;
+            overflow-x: hidden;
+            cursor: none;
+        }
+        #hero-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            background: radial-gradient(ellipse at 50% 50%, rgba(13, 13, 37, 0.8) 0%, #000 100%);
+        }
+        #laser-pointer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 10px;
+            height: 10px;
+            background-color: #a079ff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease-out;
+            box-shadow: 0 0 15px 5px rgba(160, 121, 255, 0.7);
+        }
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+        .glass-card {
+            background: rgba(10, 10, 25, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(119, 73, 255, 0.3);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(160, 121, 255, 0.8);
+            transform: translateY(-5px);
+            box-shadow: 0 0 40px rgba(119, 73, 255, 0.2);
+        }
+        .hero-title {
+            text-shadow: 0 0 15px rgba(160, 121, 255, 0.5), 0 0 30px rgba(80, 250, 250, 0.3);
+        }
+        .cta-button {
+            background: linear-gradient(90deg, #8A2BE2 0%, #4B0082 100%);
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(138, 43, 226, 0.8);
+        }
+        .secondary-button {
+             background: rgba(255, 255, 255, 0.1);
+             border: 1px solid rgba(255, 255, 255, 0.2);
+             transition: all 0.3s ease;
+        }
+        .secondary-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        .feature-icon-container {
+            background: linear-gradient(145deg, rgba(119, 73, 255, 0.1), rgba(80, 250, 250, 0.1));
+            border: 1px solid rgba(119, 73, 255, 0.3);
+        }
+        .gradient-text {
+            background: -webkit-linear-gradient(45deg, #a079ff, #50fafa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .section-glow::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(119, 73, 255, 0.15) 0%, rgba(119, 73, 255, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* Animation for scroll fade-in */
+        .fade-in-section {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .fade-in-section.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* W&B style headline animation */
+        .animated-word-container {
+            position: relative;
+            display: inline-block;
+            transition: all 0.5s ease;
+        }
+        #strikethrough-word {
+            transition: color 0.5s ease;
+        }
+        #strikethrough-word.struck {
+            position: relative;
+            color: rgba(224, 224, 224, 0.5);
+        }
+        #strikethrough-word.struck::after {
+            content: '';
+            position: absolute;
+            left: -10%;
+            right: -10%;
+            top: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 100 12' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M2,7 L35,2 L65,10 L98,5' stroke='%23fefcbf' stroke-width='3' fill='none' stroke-linecap='round'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: 100% 100%;
+            transform: scaleX(0);
+            transform-origin: left;
+            animation: strike 0.5s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+        }
+
+        @keyframes strike {
+            to {
+                transform: scaleX(1);
+            }
+        }
+
+        #correct-word {
+            font-family: 'Gochi Hand', cursive;
+            position: absolute;
+            left: 50%;
+            top: -0.2em;
+            transform: translateX(-50%) translateY(10px);
+            color: #fefcbf;
+            opacity: 0;
+            transition: opacity 0.5s ease 0.3s, transform 0.5s ease 0.3s;
+            white-space: nowrap;
+        }
+        #correct-word.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="laser-pointer"></div>
+    <canvas id="hero-canvas"></canvas>
+
+    <div class="content-wrapper">
+        <!-- Header -->
+        <header class="absolute top-0 left-0 w-full p-6 z-50">
+            <div class="container mx-auto flex justify-between items-center">
+                <a href="#" class="flex items-center">
+                   <img src="https://raw.githubusercontent.com/venkatram-2005/GitQuery/main/public/icon2.png" alt="GitQuery Logo" class="h-8 w-8 mr-3">
+                    <div class="text-2xl font-bold tracking-wider gradient-text">GitQuery</div>
+                </a>
+                <nav class="hidden md:flex items-center space-x-8 text-sm text-gray-300">
+                    <a href="#features" class="hover:text-white transition-colors">Features</a>
+                    <a href="#demo" class="hover:text-white transition-colors">Demo</a>
+                </nav>
+                <div class="flex items-center space-x-4">
+                    <a href="https://gitquery.vercel.app/" class="secondary-button px-4 py-2 rounded-md text-sm font-semibold text-white">Login</a>
+                    <a href="https://gitquery.vercel.app/" class="cta-button px-4 py-2 rounded-md text-sm font-semibold text-white">Sign Up</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <section class="min-h-screen flex items-center justify-center text-center px-4 relative overflow-hidden">
+            <div class="max-w-4xl">
+                <h1 class="hero-title text-5xl md:text-7xl font-extrabold tracking-tight mb-4" style="min-height: 180px;">
+                    <span class="animated-word-container">
+                        <span id="strikethrough-word">Search</span>
+                        <span id="correct-word">Transform</span>
+                    </span>
+                    Your Codebase Into a Conversation.
+                </h1>
+                <p class="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto mb-8">
+                    Stop searching. Start asking. Paste any GitHub repository to get instant answers, automate reviews, and understand complex code with your personal AI code guardian.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="https://gitquery.vercel.app/" class="cta-button text-white font-bold py-3 px-8 rounded-lg text-lg">
+                        Start Chatting Now
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="py-20 px-4 relative section-glow fade-in-section">
+            <div class="container mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-bold gradient-text">Your On-Demand Senior Developer</h2>
+                    <p class="text-gray-400 mt-2">GitQuery isn't just a tool; it's a new team member.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="glass-card p-8 text-center">
+                        <div class="feature-icon-container w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.657 7.343A8 8 0 0118.657 17.657c-1.577 1.577-3.343 2.657-5.657 2.986C15 22.5 12 22 10 20c1 2 2.657 1.657 2.657 1.657z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-white">Guardian Code Review</h3>
+                        <p class="text-gray-400 text-sm">Our AI acts as a guardian, analyzing pull requests for vulnerabilities, logical errors, and deviations from best practices before a human ever has to.
+                        </p>
+                    </div>
+                    <!-- Feature 2 -->
+                    <div class="glass-card p-8 text-center">
+                        <div class="feature-icon-container w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00-5.86 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-white">Codebase Forensics</h3>
+                        <p class="text-gray-400 text-sm">
+                        Untangle legacy code or explore a new open-source library in minutes. Ask "What does this legacy function do?" and get a full, documented explanation with dependencies.
+                        </p>
+                    </div>
+                    <!-- Feature 3 -->
+                    <div class="glass-card p-8 text-center">
+                        <div class="feature-icon-container w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M12 6V4m0 16v-2M12 12l2-2.828-2-2.828-2 2.828 2 2.828z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-white">Instant Onboarding</h3>
+                        <p class="text-gray-400 text-sm">
+                        New developer? No problem. They can query the codebase directly, asking "How does the auth flow work?" or "Where are the API keys stored?" instead of interrupting the team.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demo Section -->
+        <section id="demo" class="py-20 px-4 relative section-glow fade-in-section">
+            <div class="container mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-bold gradient-text">See The Guardian In Action</h2>
+                    <p class="text-gray-400 mt-2">This is not a search. This is an intelligence.</p>
+                </div>
+                <div class="glass-card p-4 md:p-8">
+                   <div class="aspect-w-16 aspect-h-9 bg-black rounded-lg overflow-hidden">
+                       <!-- This is a placeholder for an animation or video -->
+                       <div class="w-full h-full flex items-center justify-center">
+                           <div class="w-full max-w-4xl p-4">
+                               <div class="text-left font-mono text-xs md:text-sm text-gray-300 space-y-4">
+                                   <div class="flex items-start gap-3">
+                                       <span class="text-cyan-400">&gt; User:</span>
+                                       <span class="text-white">Where is the state management logic defined in this repo?</span>
+                                   </div>
+                                   <div class="flex items-start gap-3">
+                                       <span class="text-purple-400">&gt; GitQuery:</span>
+                                       <span class="text-white">Initializing analysis... Found 3 potential locations. Prioritizing...</span>
+                                   </div>
+                                   <div class="flex items-start gap-3">
+                                       <span class="text-purple-400">&gt; GitQuery:</span>
+                                       <div class="flex-1">
+                                           <p class="text-white">State management is primarily handled in the <code class="bg-gray-800 text-cyan-300 p-1 rounded">/packages/react-reconciler/</code> directory. The core logic starts in the <code class="bg-gray-800 text-cyan-300 p-1 rounded">useReducer</code> hook, which you can find in:</p>
+                                           <div class="bg-gray-900 border border-purple-500/30 rounded mt-2 p-3 text-gray-400">
+                                               <p>// file: react_hooks.js:245</p>
+                                               <p><span class="text-purple-400">function</span> <span class="text-green-400">useReducer</span>(<span class="text-yellow-400">reducer</span>, <span class="text-yellow-400">initialState</span>) {</p>
+                                               <p>  <span class="text-purple-400">const</span> <span class="text-blue-400">dispatch</span> = <span class="text-green-400">useCallback</span>(...);</p>
+                                               <p>  <span class="text-gray-500">// ... implementation details</span></p>
+                                               <p>}</p>
+                                           </div>
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA -->
+        <section class="py-20 px-4 text-center fade-in-section">
+            <div class="container mx-auto">
+                <h2 class="text-4xl font-bold hero-title mb-4">Ready to Transform Your Workflow?</h2>
+                <p class="text-gray-300 max-w-xl mx-auto mb-8">
+                    Give your team the power of a codebase that talks back. Analyze your first repository for free.
+                </p>
+                <a href="https://gitquery.vercel.app/" class="cta-button text-white font-bold py-4 px-10 rounded-lg text-xl inline-block">
+                    Deploy Your AI Guardian
+                </a>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="py-8 px-4 border-t border-gray-800/50">
+            <div class="container mx-auto text-center text-gray-500 text-sm">
+                <p>&copy; 2025 GitQuery. All rights reserved. Code the future.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+    window.addEventListener('DOMContentLoaded', (event) => {
+        // 3D Animated Background with Three.js
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('hero-canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        camera.position.z = 5;
+
+        // Create a group for the central "code structure"
+        const structureGroup = new THREE.Group();
+        const nodes = [];
+        const NODE_COUNT = 50;
+        const RADIUS = 2;
+
+        // Nodes
+        const nodeGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+        const nodeMaterial = new THREE.MeshBasicMaterial({ color: 0x50fafa });
+        for (let i = 0; i < NODE_COUNT; i++) {
+            const phi = Math.acos(-1 + (2 * i) / NODE_COUNT);
+            const theta = Math.sqrt(NODE_COUNT * Math.PI) * phi;
+            const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+            node.position.setFromSphericalCoords(RADIUS, phi, theta);
+            nodes.push(node);
+            structureGroup.add(node);
+        }
+
+        // Connections
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: 0x7749ff,
+            transparent: true,
+            opacity: 0.3
+        });
+        for (let i = 0; i < NODE_COUNT; i++) {
+            for (let j = i + 1; j < NODE_COUNT; j++) {
+                if (Math.random() > 0.98) {
+                    const points = [nodes[i].position, nodes[j].position];
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    structureGroup.add(line);
+                }
+            }
+        }
+        scene.add(structureGroup);
+
+
+        // Particle system for "data bits"
+        const particleCount = 5000;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i++) {
+            positions[i] = (Math.random() - 0.5) * 20;
+        }
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.01,
+            transparent: true,
+            opacity: 0.5
+        });
+        const particleSystem = new THREE.Points(particles, particleMaterial);
+        scene.add(particleSystem);
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            structureGroup.rotation.x += 0.0015;
+            structureGroup.rotation.y += 0.003;
+
+            particleSystem.rotation.y += 0.0006;
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onWindowResize, false);
+
+        animate();
+        
+        // Scroll fade-in animation logic
+        const sections = document.querySelectorAll('.fade-in-section');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        sections.forEach(section => {
+            observer.observe(section);
+        });
+
+        // W&B style headline animation
+        function animateHeadline() {
+            const strikethroughEl = document.getElementById('strikethrough-word');
+            const correctEl = document.getElementById('correct-word');
+            const correctWordText = correctEl.textContent;
+            correctEl.textContent = '';
+
+
+            // Reset animation for looping if needed in future
+            strikethroughEl.classList.remove('struck');
+            correctEl.classList.remove('visible');
+
+            setTimeout(() => {
+                strikethroughEl.classList.add('struck');
+                correctEl.classList.add('visible');
+
+                // Start typewriter effect after a short delay to sync with animations
+                setTimeout(() => {
+                    let i = 0;
+                    const typingSpeed = 100; // ms per character
+                    const typeInterval = setInterval(() => {
+                        if (i < correctWordText.length) {
+                            correctEl.textContent += correctWordText.charAt(i);
+                            i++;
+                        } else {
+                            clearInterval(typeInterval);
+                        }
+                    }, typingSpeed);
+                }, 300); // Start typing as the word begins to fade in
+
+            }, 100); // Start animation almost immediately
+        }
+        
+        animateHeadline();
+
+        // Mouse follow laser pointer effect
+        const pointer = document.getElementById('laser-pointer');
+        window.addEventListener('mousemove', (e) => {
+            pointer.style.left = `${e.clientX}px`;
+            pointer.style.top = `${e.clientY}px`;
+        });
+    });
+    </script>
+</body>
+</html>
+
+
